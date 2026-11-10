@@ -22,21 +22,11 @@ export const createApp = (): Application => {
   const app = express();
 
   // CORS configuration
-  const allowedOrigins = [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-  ];
-
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(null, true); // Allow all in dev mode for smooth onboarding
-        }
+        // Allow all origins in production & development for API flexibility
+        callback(null, true);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -48,41 +38,51 @@ export const createApp = (): Application => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Static uploads directory
-  const uploadsPath = path.join(process.cwd(), 'uploads');
+  // Static uploads directory (supports Vercel /tmp or local uploads)
+  const uploadsPath = process.env.VERCEL
+    ? path.join('/tmp', 'uploads')
+    : path.join(process.cwd(), 'uploads');
+
   if (!fs.existsSync(uploadsPath)) {
-    fs.mkdirSync(uploadsPath, { recursive: true });
+    try {
+      fs.mkdirSync(uploadsPath, { recursive: true });
+    } catch {}
   }
   app.use('/uploads', express.static(uploadsPath));
+  app.use('/api/uploads', express.static(uploadsPath));
 
-  // Health check
-  app.get('/api/health', (req: Request, res: Response) => {
+  // Health check endpoints
+  const handleHealth = (req: Request, res: Response) => {
     res.json({
       status: 'ok',
       service: 'Digital Kirana API Engine',
-      environment: process.env.NODE_ENV || 'development',
+      environment: process.env.NODE_ENV || 'production',
+      vercel: Boolean(process.env.VERCEL),
       timestamp: new Date().toISOString(),
     });
-  });
+  };
 
-  // API Routes
-  app.use('/api/auth', authRoutes);
-  app.use('/api/business', businessRoutes);
-  app.use('/api/products', productRoutes);
-  app.use('/api/inventory', inventoryRoutes);
-  app.use('/api/orders', orderRoutes);
-  app.use('/api/customers', customerRoutes);
-  app.use('/api/reports', reportRoutes);
-  app.use('/api/offers', offerRoutes);
-  app.use('/api/notifications', notificationRoutes);
-  app.use('/api/bin', binRoutes);
-  app.use('/api/upload', uploadRoutes);
-  app.use('/api/categories', categoryRoutes);
+  app.get('/api/health', handleHealth);
+  app.get('/health', handleHealth);
 
-  // Fallback 404
-  app.use((req: Request, res: Response) => {
-    res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.url}` });
-  });
+  // Mount routes for both /api/* and /* (supports direct Vercel serverless functions & local proxy)
+  const registerRoutes = (prefix = '') => {
+    app.use(`${prefix}/auth`, authRoutes);
+    app.use(`${prefix}/business`, businessRoutes);
+    app.use(`${prefix}/products`, productRoutes);
+    app.use(`${prefix}/inventory`, inventoryRoutes);
+    app.use(`${prefix}/orders`, orderRoutes);
+    app.use(`${prefix}/customers`, customerRoutes);
+    app.use(`${prefix}/reports`, reportRoutes);
+    app.use(`${prefix}/offers`, offerRoutes);
+    app.use(`${prefix}/notifications`, notificationRoutes);
+    app.use(`${prefix}/bin`, binRoutes);
+    app.use(`${prefix}/upload`, uploadRoutes);
+    app.use(`${prefix}/categories`, categoryRoutes);
+  };
+
+  registerRoutes('/api');
+  registerRoutes('');
 
   // Central error handler
   app.use(errorHandler);
@@ -91,4 +91,3 @@ export const createApp = (): Application => {
 };
 
 export default createApp;
-
