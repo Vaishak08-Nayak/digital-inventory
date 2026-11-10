@@ -46,7 +46,7 @@ export const createApp = (): Application => {
   if (!fs.existsSync(uploadsPath)) {
     try {
       fs.mkdirSync(uploadsPath, { recursive: true });
-    } catch {}
+    } catch { }
   }
   app.use('/uploads', express.static(uploadsPath));
   app.use('/api/uploads', express.static(uploadsPath));

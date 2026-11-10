@@ -17,7 +17,7 @@ const sendTokenResponse = (res: Response, user: any, business?: any) => {
 
   res.cookie('jwt', token, {
     httpOnly: true,
-    secure: process.env.COOKIE_SECURE === 'true',
+    secure: process.env.COOKIE_SECURE === 'true' || Boolean(process.env.VERCEL),
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
